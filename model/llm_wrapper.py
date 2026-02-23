@@ -12,28 +12,25 @@ client = OpenAI(
 MODEL_PATH = "model/qwen2.5-1.5b-instruct-q4_k_m.gguf"
 llm = Llama(
     model_path=MODEL_PATH,
-    n_ctx=1024,
+    n_ctx=4080,
     verbose=False
 )
 
-def say(text, env="local", type="router"):
+def say(text, env="local", type="chat", shapes=None, instructions=None):
     prompt = f"""
 You are a TOOL ROUTER. You do NOT answer the user. You only choose whether to call a tool and extract arguments.
 
 Return VALID JSON only. One JSON object. No markdown. No extra text.
 
 Tools and args:
-- timer: {{"duration": number, "unit": "seconds"|"minutes"}}
-- notes: {{"action": "add"|"list"|"delete", "content": string (required for add/delete)}}
-- weather: {{"location": string}}
+
+{instructions}
 
 Output formats (choose ONE):
 
 If a tool is needed, return ONE of these shapes:
 
-{{"type":"timer","args":{{"duration":5,"unit":"minutes"}}}}
-{{"type":"weather","args":{{"location":"current location"}}}}
-{{"type":"notes","args":{{"action":"add","content":"buy bananas"}}}}
+{shapes}
 
 If no tool is needed, return:
 
@@ -92,7 +89,7 @@ JSON:
             messages=[
                 {
                     "role": "user",
-                    "content": prompt
+                    "content": text
                 }
             ],
             model="openai/gpt-oss-20b"
