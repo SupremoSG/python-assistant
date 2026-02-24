@@ -3,9 +3,9 @@ import json
 import requests
 
 def instruction():
-    return '"location": string'
+    return '"city": string (empty if not provided), "state": string (empty if not provided), "country_code": string (empty if not provided). NEVER use placeholders like "current location", "current state", "current country". Use empty string instead.'
 def shape():
-    return '"weather","args":{"location":"current location"}'
+    return '"weather","args":{"city":"", "state":"", "country_code":""}'
 
 WEATHER_CODES = {
     0:  "Clear sky",
@@ -101,8 +101,8 @@ def parseTime(req):
 }}
 """
 
-def getWeather(text, location):
-    lat, lon = getCoords(location)
+def getWeather(text, city, state=None, country=None):
+    lat, lon = getCoords(city, state, country)
     print(lat, lon)
     web = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&timezone=auto&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&current=temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,rain,showers,snowfall,cloud_cover,wind_speed_10m,wind_direction_10m,wind_gusts_10m,pressure_msl,visibility&hourly=temperature_2m,apparent_temperature,relative_humidity_2m,precipitation_probability,precipitation,rain,showers,snowfall,snow_depth,cloud_cover,visibility,wind_speed_10m,wind_direction_10m,wind_gusts_10m,pressure_msl,weathercode&daily=weathercode,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,precipitation_sum,rain_sum,showers_sum,snowfall_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max,wind_direction_10m_dominant,sunrise,sunset&forecast_days=7"
     req = requests.get(web).json()
@@ -131,24 +131,36 @@ def getWeather(text, location):
 
     return say(prompt, env="groq", type="chat")
 
-def getCoords(location):
-    web = f"https://geocoding-api.open-meteo.com/v1/search?name={location}&count=1&language=en&format=json"
-    req = requests.get(web)
+def getCoords(city, state, country_code):
+    location = f"{city} {state} {country_code}"
+    web = f"https://nominatim.openstreetmap.org/search"
+    headers = {
+        "User-Agent": "weather-assistant/1.0 (personal demo project)"
+    }
+    params = {
+        "q": location,
+        "format": "json",
+        "limit": 1
+    }
+
+    req = requests.get(web, params=params, headers=headers)
     print(req.status_code)
     print(req.headers.get("content-type"))
     print(req.text[:200])
     data = req.json()
-    lat, lon = data["results"][0]["latitude"], data["results"][0]["longitude"]
+    lat, lon = data[0]["lat"], data[0]["lon"]
     return lat, lon
 
 def main(args, text):
     if not isinstance(args, dict) or args == "":
         return "I didn't understand your request."
     try:
-        location = args["location"]
-        return getWeather(text, location)
+        city = args["city"]
+        state = args["state"]
+        country = args["country_code"]
+        return getWeather(text, city, state, country)
     except Exception as e:
-        print("I had a problem while loading the weather,", e)
+        return ("Something isn't quite right with your request", e)
 
 if __name__ == "__main__":
     main()
