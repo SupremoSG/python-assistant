@@ -1,4 +1,6 @@
 from model.llm_wrapper import say
+from datetime import datetime
+from pathlib import Path
 import json
 import requests
 
@@ -80,13 +82,16 @@ def parseTime(req):
         weathercode_week.append(req.get("daily", {}).get("weathercode", [])[i])
         max_week.append(req.get("daily", {}).get("temperature_2m_max", [])[i])
         min_week.append(req.get("daily", {}).get("temperature_2m_min", [])[i])
-        precip_sum_week.append(req.get("daily", {}).get("precipitation_sum", [])[i])
-        week += f'{{"d":"{date[i]}", "temp_max":{max_week[i]}, "temp_min":{min_week[i]}, "precip":{precip_sum_week[i]}, "weather":"{WEATHER_CODES[weathercode_week[i]]}"}},\n'
+        precip_sum_week.append(req.get("daily", {}).get("precipitation_sum", [])[i]) 
+        weekday = datetime.strptime(date[i], "%Y-%m-%d")
+        week += f'{{"d":"{date[i]} {weekday.strftime("%A")}", "temp_max":{max_week[i]}, "temp_min":{min_week[i]}, "precip":{precip_sum_week[i]}, "weather":"{WEATHER_CODES[weathercode_week[i]]}"}},\n'
+
+    today = datetime.strptime(date[0], "%Y-%m-%d")
 
     return f"""
 {{
     "daily": {{
-        "todays_date": {date[0]},
+        "todays_date": {date[0]} {today.strftime("%A")},
         "high": {temperature_2m_max[0]},
         "low": {temperature_2m_min[0]},
         "precipitation_sum": {precipitation_sum[0]},
@@ -132,6 +137,11 @@ def getWeather(text, city, state=None, country=None):
     return say(prompt, env="groq", type="chat")
 
 def getCoords(city, state, country_code):
+    if city == "":
+        webip = 'http://ip-api.com/json/'
+        req = requests.get(webip).json()
+        return req.get("lat"), req.get("lon")
+
     location = f"{city} {state} {country_code}"
     web = f"https://nominatim.openstreetmap.org/search"
     headers = {
@@ -158,6 +168,7 @@ def main(args, text):
         city = args["city"]
         state = args["state"]
         country = args["country_code"]
+        
         return getWeather(text, city, state, country)
     except Exception as e:
         return ("Something isn't quite right with your request", e)
